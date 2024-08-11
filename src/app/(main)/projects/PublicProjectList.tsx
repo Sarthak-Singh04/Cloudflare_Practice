@@ -1,28 +1,50 @@
-// components/PublicProjectsList.tsx
 "use client";
 
 import React, { useRef, useCallback } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, InfiniteData, QueryFunctionContext } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import Link from 'next/link';
 import ProjectCard from './ProjectCard';
 import LoadingCardGrid from '@/components/LoadingCardGrid';
-import { Project, ProjectsResponse } from '@/types/project';
 import { useIntersectionObserver } from '@/hooks/useIntersectionObserver';
 import { useAxiosWithPrivy } from '@/lib/axiosWithToken';
+
+interface Project {
+  id: string;
+  title: string;
+  content: string;
+  slug: string;
+  createdAt: string;
+  imageUrl: string | null;
+  author: {
+    username: string;
+  };
+  // Add other project properties as needed
+}
+
+interface ProjectsResponse {
+  projects: Project[];
+  nextCursor: number | null;
+  totalCount: number;
+}
+
+type QueryKey = ['publicProjects'];
 
 const PublicProjectsList: React.FC = () => {
   const axiosInstance = useAxiosWithPrivy();
 
-  const fetchPublicProjects = useCallback(async ({ pageParam = 1 }): Promise<ProjectsResponse> => {
-    try {
-      const { data } = await axiosInstance.get(`/projects/public?page=${pageParam}&limit=9`);
-      return data;
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      throw new Error('Failed to fetch projects. Please try again later.');
-    }
-  }, [axiosInstance]);
+  const fetchPublicProjects = useCallback(
+    async ({ pageParam = 1 }: QueryFunctionContext<QueryKey, number>): Promise<ProjectsResponse> => {
+      try {
+        const { data } = await axiosInstance.get(`/projects/public?page=${pageParam}&limit=9`);
+        return data;
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        throw new Error('Failed to fetch projects. Please try again later.');
+      }
+    },
+    [axiosInstance]
+  );
 
   const {
     data,
@@ -31,7 +53,7 @@ const PublicProjectsList: React.FC = () => {
     hasNextPage,
     isFetchingNextPage,
     status,
-  } = useInfiniteQuery<ProjectsResponse, Error>({
+  } = useInfiniteQuery<ProjectsResponse, Error, InfiniteData<ProjectsResponse>, QueryKey, number>({
     queryKey: ['publicProjects'],
     queryFn: fetchPublicProjects,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -66,7 +88,10 @@ const PublicProjectsList: React.FC = () => {
               <Link href={`/projects/${project.slug}`} key={project.id} passHref>
                 <ProjectCard
                   project={{
-                    ...project,
+                    title: project.title,
+                    content: project.content,
+                    imageUrl: project.imageUrl,
+                    author: project.author,
                     createdAt: format(new Date(project.createdAt), 'PPP'),
                   }}
                 />
